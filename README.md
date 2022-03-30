@@ -5,7 +5,7 @@ WebRtc开发的视频会议支持群呼、单呼叫（P2P）、房间模式、�
 
 
 
-试例APK下载：[apk下载](https://github.com/435295045/MediaExample/blob/main/app/release/app-release.apk)
+试例APK下载：[apk下载](https://github.com/435295045/MediaExample/raw/main/app/release/app-release.apk)
 
 
 
