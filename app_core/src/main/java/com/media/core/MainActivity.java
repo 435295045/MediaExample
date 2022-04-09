@@ -20,6 +20,7 @@ import com.media.core.ui.p2p.P2PActivity;
 import com.media.core.ui.p2p.P2PListActivity;
 import com.media.core.ui.room.RoomListActivity;
 import com.media.core.ui.utils.SPUtils;
+import com.media.core.utils.DeviceUuidFactory;
 import com.media.rtc.MediaSDK;
 import com.media.rtc.listener.RegisterListener;
 import com.media.rtc.media.door.listener.DoorListener;
@@ -28,6 +29,8 @@ import com.media.rtc.media.group.listener.GroupListener;
 import com.media.rtc.media.group.listener.state.GroupState;
 import com.media.rtc.media.p2p.listener.P2PListener;
 import com.media.rtc.media.p2p.listener.state.P2PState;
+import com.web.socket.message.MessageConstant;
+import com.web.socket.utils.LoggerUtils;
 import com.web.socket.utils.StringUtils;
 
 
@@ -39,12 +42,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private TextView tViewClient, tViewState;
     private Button btnGroupCall, btnRoom;
-
+    //设备唯一ID
+    private DeviceUuidFactory deviceUuidFactory;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        deviceUuidFactory = new DeviceUuidFactory(this);
         tViewClient = findViewById(R.id.tViewClient);
         tViewState = findViewById(R.id.tViewState);
 
@@ -70,7 +75,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         if (StringUtils.isEmpty(clientId)) {
             clientDialog();
         } else {
-            MediaSDK.register(clientId);
+            MediaSDK.register(clientId, deviceUuidFactory.getDeviceUuid().toString(), false);
             tViewClient.setText(clientId);
         }
 
@@ -93,8 +98,30 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     @Override
-    public void onRegister(int code) {
+    public void onRegister(int code, String data) {
+        LoggerUtils.e("ssss", "------------------:   " + data);
         tViewState.setText(String.valueOf(code));
+        if (code == MessageConstant.RETURN_CODE_CLOSE_DEVICE_EXIST) {
+            AlertDialog alertDialog = new AlertDialog.Builder(this)
+                    .setTitle("你已经在别的设备登录，是否强制登录")
+                    .setIcon(R.mipmap.ic_launcher)
+                    .setPositiveButton("确定", new DialogInterface.OnClickListener() {//添加"Yes"按钮
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            String clientId = SPUtils.getString(MainActivity.this, MainConstant.SP_KEY_CLIENT, "");
+                            MediaSDK.register(clientId, deviceUuidFactory.getDeviceUuid().toString(), true);
+                        }
+                    })
+
+                    .setNegativeButton("取消", new DialogInterface.OnClickListener() {//添加取消
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            dialogInterface.dismiss();
+                        }
+                    })
+                    .create();
+            alertDialog.show();
+        }
     }
 
     private void clientDialog() {
@@ -112,7 +139,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             return;
                         }
                         SPUtils.putString(MainActivity.this, MainConstant.SP_KEY_CLIENT, clientId);
-                        MediaSDK.register(clientId);
+                        MediaSDK.register(clientId, deviceUuidFactory.getDeviceUuid().toString(), false);
                         tViewClient.setText(clientId);
                         dialogInterface.dismiss();
                     }
