@@ -80,7 +80,7 @@ public class DoorActivity extends AppCompatActivity implements
         if (clients == null) {
             tViewAnswer.setVisibility(View.VISIBLE);
         } else {
-            MediaSDK.door().call(clients);
+            MediaSDK.door().call("9876543212345678", clients);
         }
     }
 

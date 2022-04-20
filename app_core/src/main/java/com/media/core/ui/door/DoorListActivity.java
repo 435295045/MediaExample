@@ -62,7 +62,6 @@ public class DoorListActivity extends AppCompatActivity implements
 
     private void getClients() {
         List<String> strings = SPUtils.getClazz(this, SP_CLIENTS_KEY, List.class);
-        LoggerUtils.e("---------------------: " + strings);
         if (strings != null) {
             clients.clear();
             clients.addAll(strings);

@@ -22,7 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class GroupListActivity extends AppCompatActivity implements
-        View.OnClickListener{
+        View.OnClickListener {
     private final String SP_CLIENTS_KEY = "SP_CLIENTS_KEY";
     private GroupAdapter groupAdapter;
     private final List<String> clients = new ArrayList<>();
@@ -55,7 +55,7 @@ public class GroupListActivity extends AppCompatActivity implements
                 Toast.makeText(this, "请先选择呼叫用户！", Toast.LENGTH_SHORT).show();
                 return;
             }
-            if (MediaSDK.group().call(cs)) {
+            if (MediaSDK.group().call("1234567876543234567", cs)) {
                 Intent intent = new Intent(this, GroupActivity.class);
                 intent.putExtra("initiator", "initiator");
                 startActivity(intent);
@@ -65,7 +65,6 @@ public class GroupListActivity extends AppCompatActivity implements
 
     private void getClients() {
         List<String> strings = SPUtils.getClazz(this, SP_CLIENTS_KEY, List.class);
-        LoggerUtils.e("---------------------: " + strings);
         if (strings != null) {
             clients.clear();
             clients.addAll(strings);

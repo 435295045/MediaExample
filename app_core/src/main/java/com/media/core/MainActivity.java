@@ -29,6 +29,8 @@ import com.media.rtc.media.group.listener.GroupListener;
 import com.media.rtc.media.group.listener.state.GroupState;
 import com.media.rtc.media.p2p.listener.P2PListener;
 import com.media.rtc.media.p2p.listener.state.P2PState;
+import com.web.socket.AuthType;
+import com.web.socket.RegisterConfig;
 import com.web.socket.message.MessageConstant;
 import com.web.socket.utils.LoggerUtils;
 import com.web.socket.utils.StringUtils;
@@ -75,7 +77,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         if (StringUtils.isEmpty(clientId)) {
             clientDialog();
         } else {
-            MediaSDK.register(clientId, deviceUuidFactory.getDeviceUuid().toString(), false);
+            MediaSDK.register(RegisterConfig.builder()
+                    .authType(AuthType.NON_AUTH)
+                    .deviceId(deviceUuidFactory.getDeviceUuid().toString())
+                    .clientId(clientId)
+            );
             tViewClient.setText(clientId);
         }
 
@@ -109,7 +115,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         @Override
                         public void onClick(DialogInterface dialogInterface, int i) {
                             String clientId = SPUtils.getString(MainActivity.this, MainConstant.SP_KEY_CLIENT, "");
-                            MediaSDK.register(clientId, deviceUuidFactory.getDeviceUuid().toString(), true);
+                            MediaSDK.register(RegisterConfig.builder()
+                                    .authType(AuthType.NON_AUTH)
+                                    .deviceId(deviceUuidFactory.getDeviceUuid().toString())
+                                    .force(true)
+                                    .clientId(clientId)
+                            );
                         }
                     })
 
@@ -139,7 +150,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             return;
                         }
                         SPUtils.putString(MainActivity.this, MainConstant.SP_KEY_CLIENT, clientId);
-                        MediaSDK.register(clientId, deviceUuidFactory.getDeviceUuid().toString(), false);
+                        MediaSDK.register(RegisterConfig.builder()
+                                .authType(AuthType.NON_AUTH)
+                                .deviceId(deviceUuidFactory.getDeviceUuid().toString())
+                                .clientId(clientId)
+                        );
                         tViewClient.setText(clientId);
                         dialogInterface.dismiss();
                     }
