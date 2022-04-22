@@ -28,6 +28,7 @@ import com.media.rtc.media.room.listener.RoomListener;
 import com.media.rtc.media.room.listener.state.RoomState;
 import com.media.rtc.media.room.model.ClientDescription;
 import com.media.rtc.media.room.model.RoomModel;
+import com.media.rtc.webrtc.PeerFactoryHelper;
 import com.media.rtc.webrtc.peer.Peer;
 import com.web.socket.message.MessageConstant;
 import com.web.socket.utils.LoggerUtils;
@@ -50,7 +51,7 @@ public class RoomActivity extends AppCompatActivity implements View.OnClickListe
     private int mScreenWidth;
     //记录所有成员
     private final List<Member> members = new ArrayList<>();
-    private Peer localPeer;
+    private PeerFactoryHelper peerFactory;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -98,20 +99,20 @@ public class RoomActivity extends AppCompatActivity implements View.OnClickListe
     public void onClick(View v) {
         int id = v.getId();
         if (id == R.id.tViewSwitchMute) {
-            if (localPeer != null) {
-                localPeer.microphoneMute(!localPeer.isMicrophoneMute());
+            if (peerFactory != null) {
+                peerFactory.microphoneMute(!peerFactory.isMicrophoneMute());
             }
         } else if (id == R.id.tViewHandFree) {
-            if (localPeer != null) {
-                localPeer.speakerphone(!localPeer.isSpeakerphone());
+            if (peerFactory != null) {
+                peerFactory.speakerphone(!peerFactory.isSpeakerphone());
             }
         } else if (id == R.id.tViewOpenCamera) {
-            if (localPeer != null) {
-                localPeer.videoEnabled(!localPeer.isVideoEnabled());
+            if (peerFactory != null) {
+                peerFactory.videoEnabled(!peerFactory.isVideoEnabled());
             }
         } else if (id == R.id.tViewSwitchCamera) {
-            if (localPeer != null) {
-                localPeer.switchCamera();
+            if (peerFactory != null) {
+                peerFactory.switchCamera();
             }
         } else if (id == R.id.tViewHangUp) {
             MediaSDK.room().leave();
@@ -232,18 +233,19 @@ public class RoomActivity extends AppCompatActivity implements View.OnClickListe
             } else {
                 removeMember(leave.clientId);
             }
-        } else if (roomState instanceof RoomState.Media) {
-            RoomState.Media media = (RoomState.Media) roomState;
+        } else if (roomState instanceof RoomState.LocalMedia) {
+            RoomState.LocalMedia media = (RoomState.LocalMedia) roomState;
+            this.peerFactory = media.factory;
+            Member member = MemberUtils.createMember(this, media.peer, null);
+            if (media.factory.localMedia != null) {
+                media.factory.localMedia.localVideoTrack.addSink(member.sink);
+                addMember(member, true);
+            }
+        } else if (roomState instanceof RoomState.RemoteMedia) {
+            RoomState.RemoteMedia media = (RoomState.RemoteMedia) roomState;
             //媒体连接成功
             Member member = MemberUtils.createMember(this, media.peer, media.stream);
-            if (media.stream == null) {
-                localPeer = media.peer;
-                //自己预览
-                media.peer.setLocalSink(member.sink);
-                addMember(member, true);
-            } else {
-                addMember(member, false);
-            }
+            addMember(member, false);
         }
     }
 

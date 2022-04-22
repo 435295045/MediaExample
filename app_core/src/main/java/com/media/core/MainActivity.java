@@ -105,7 +105,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     @Override
     public void onRegister(int code, String data) {
-        LoggerUtils.e("ssss", "------------------:   " + data);
+        LoggerUtils.e("onRegister", "------------------onRegister:   " + data);
         tViewState.setText(String.valueOf(code));
         if (code == MessageConstant.RETURN_CODE_CLOSE_DEVICE_EXIST) {
             AlertDialog alertDialog = new AlertDialog.Builder(this)

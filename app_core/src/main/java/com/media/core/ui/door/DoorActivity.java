@@ -25,6 +25,7 @@ import com.media.core.ui.utils.Utils;
 import com.media.rtc.MediaSDK;
 import com.media.rtc.media.door.listener.DoorListener;
 import com.media.rtc.media.door.listener.state.DoorState;
+import com.media.rtc.webrtc.PeerFactoryHelper;
 import com.media.rtc.webrtc.peer.Peer;
 import com.web.socket.message.MessageConstant;
 import com.web.socket.utils.LoggerUtils;
@@ -44,7 +45,7 @@ public class DoorActivity extends AppCompatActivity implements
     private int mScreenWidth;
     //记录所有成员
     private final List<Member> members = new ArrayList<>();
-    private Peer localPeer;
+    private PeerFactoryHelper peerFactory;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -101,20 +102,20 @@ public class DoorActivity extends AppCompatActivity implements
     public void onClick(View v) {
         int id = v.getId();
         if (id == R.id.tViewSwitchMute) {
-            if (localPeer != null) {
-                localPeer.microphoneMute(!localPeer.isMicrophoneMute());
+            if (peerFactory != null) {
+                peerFactory.microphoneMute(!peerFactory.isMicrophoneMute());
             }
         } else if (id == R.id.tViewHandFree) {
-            if (localPeer != null) {
-                localPeer.speakerphone(!localPeer.isSpeakerphone());
+            if (peerFactory != null) {
+                peerFactory.speakerphone(!peerFactory.isSpeakerphone());
             }
         } else if (id == R.id.tViewOpenCamera) {
-            if (localPeer != null) {
-                localPeer.videoEnabled(!localPeer.isVideoEnabled());
+            if (peerFactory != null) {
+                peerFactory.videoEnabled(!peerFactory.isVideoEnabled());
             }
         } else if (id == R.id.tViewSwitchCamera) {
-            if (localPeer != null) {
-                localPeer.switchCamera();
+            if (peerFactory != null) {
+                peerFactory.switchCamera();
             }
         } else if (id == R.id.tViewAnswer) {
             MediaSDK.door().answer();
@@ -249,18 +250,19 @@ public class DoorActivity extends AppCompatActivity implements
             } else {
                 removeMember(hangUp.clientId);
             }
-        } else if (doorState instanceof DoorState.Media) {
-            DoorState.Media media = (DoorState.Media) doorState;
+        } else if (doorState instanceof DoorState.LocalMedia) {
+            DoorState.LocalMedia media = (DoorState.LocalMedia) doorState;
+            this.peerFactory = media.factory;
+            Member member = MemberUtils.createMember(this, media.peer, null);
+            if (media.factory.localMedia != null) {
+                media.factory.localMedia.localVideoTrack.addSink(member.sink);
+                addMember(member, true);
+            }
+        } else if (doorState instanceof DoorState.RemoteMedia) {
+            DoorState.RemoteMedia media = (DoorState.RemoteMedia) doorState;
             //媒体连接成功
             Member member = MemberUtils.createMember(this, media.peer, media.stream);
-            if (media.stream == null) {
-                localPeer = media.peer;
-                //自己预览
-                media.peer.setLocalSink(member.sink);
-                addMember(member, true);
-            } else {
-                addMember(member, false);
-            }
+            addMember(member, false);
         }
     }
 

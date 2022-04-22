@@ -12,7 +12,7 @@ import org.webrtc.SurfaceViewRenderer;
 public class MemberUtils {
     public static Member createMember(Activity activity, Peer peer, MediaStream stream) {
         SurfaceViewRenderer renderer = new SurfaceViewRenderer(activity.getApplication());
-        renderer.init(peer.eglBase.getEglBaseContext(), null);
+        renderer.init(peer.getEglBase().getEglBaseContext(), null);
         renderer.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT);
         renderer.setMirror(true);
         // set render

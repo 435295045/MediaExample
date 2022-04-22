@@ -17,6 +17,7 @@ import com.media.core.ui.utils.PermissionUtil;
 import com.media.rtc.MediaSDK;
 import com.media.rtc.media.p2p.listener.P2PListener;
 import com.media.rtc.media.p2p.listener.state.P2PState;
+import com.media.rtc.webrtc.PeerFactoryHelper;
 import com.media.rtc.webrtc.peer.Peer;
 import com.web.socket.utils.LoggerUtils;
 import com.web.socket.utils.StringUtils;
@@ -28,7 +29,8 @@ public class P2PActivity extends AppCompatActivity implements View.OnClickListen
 
     private FrameLayout fLayoutLocalVideo, fLayoutRemoteVideo;
     private TextView tViewAnswer;
-    private Member localMember, remoteMember;
+    private Member remoteMember;
+    private PeerFactoryHelper peerFactory;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,20 +68,20 @@ public class P2PActivity extends AppCompatActivity implements View.OnClickListen
     public void onClick(View v) {
         int id = v.getId();
         if (id == R.id.tViewSwitchMute) {
-            if (localMember != null && localMember.peer != null) {
-                localMember.peer.microphoneMute(!localMember.peer.isMicrophoneMute());
+            if (peerFactory != null) {
+                peerFactory.microphoneMute(!peerFactory.isMicrophoneMute());
             }
         } else if (id == R.id.tViewHandFree) {
-            if (localMember != null && localMember.peer != null) {
-                localMember.peer.speakerphone(!localMember.peer.isSpeakerphone());
+            if (peerFactory != null) {
+                peerFactory.speakerphone(!peerFactory.isSpeakerphone());
             }
         } else if (id == R.id.tViewOpenCamera) {
-            if (localMember != null && localMember.peer != null) {
-                localMember.peer.videoEnabled(!localMember.peer.isVideoEnabled());
+            if (peerFactory != null) {
+                peerFactory.videoEnabled(!peerFactory.isVideoEnabled());
             }
         } else if (id == R.id.tViewSwitchCamera) {
-            if (localMember != null && localMember.peer != null) {
-                localMember.peer.switchCamera();
+            if (peerFactory != null) {
+                peerFactory.switchCamera();
             }
         } else if (id == R.id.tViewAnswer) {
             MediaSDK.p2p().answer();
@@ -100,33 +102,28 @@ public class P2PActivity extends AppCompatActivity implements View.OnClickListen
 
         } else if (p2pState instanceof P2PState.HangUp) {
             finish();
-        } else if (p2pState instanceof P2PState.Media){
-            P2PState.Media media = (P2PState.Media) p2pState;
-            Member member = MemberUtils.createMember(this, media.peer, media.stream);
-            if (media.stream == null) {
-                localMember = member;
-                //自己预览
-                media.peer.setLocalSink(member.sink);
+        } else if (p2pState instanceof P2PState.LocalMedia) {
+            P2PState.LocalMedia media = (P2PState.LocalMedia) p2pState;
+            Member member = MemberUtils.createMember(this, media.peer, null);
+            this.peerFactory = media.factory;
+            //自己预览
+            if (media.factory.localMedia != null) {
+                media.factory.localMedia.localVideoTrack.addSink(member.sink);
                 fLayoutLocalVideo.addView(member.renderer);
                 member.renderer.setZOrderOnTop(true);
-            } else {
-                remoteMember = member;
-                fLayoutRemoteVideo.addView(member.renderer);
-                member.renderer.getHolder().setFormat(PixelFormat.TRANSPARENT);
             }
+        } else if (p2pState instanceof P2PState.RemoteMedia) {
+            P2PState.RemoteMedia media = (P2PState.RemoteMedia) p2pState;
+            Member member = MemberUtils.createMember(this, media.peer, media.stream);
+            remoteMember = member;
+            fLayoutRemoteVideo.addView(member.renderer);
+            member.renderer.getHolder().setFormat(PixelFormat.TRANSPARENT);
         }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (localMember != null && localMember.renderer != null) {
-            localMember.renderer.release();
-        }
-        if (localMember != null && localMember.sink != null) {
-            localMember.sink.setTarget(null);
-        }
-
         if (remoteMember != null && remoteMember.renderer != null) {
             remoteMember.renderer.release();
         }
