@@ -127,7 +127,6 @@ public class DoorActivity extends AppCompatActivity implements
 
     private void addMember(DoorState.Media media) {
         Member member = memberHandle.getMember(media.peer.id);
-        LoggerUtils.e(TAG, "---------------:  "+media.toString());
         //如果存在先释放
         if (member != null) {
             if (member.renderer != null)
