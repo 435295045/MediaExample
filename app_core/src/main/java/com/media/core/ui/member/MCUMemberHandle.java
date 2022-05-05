@@ -13,11 +13,11 @@ import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.Map;
 
-public class MemberHandle {
+public class MCUMemberHandle {
     //记录所有Member
     public final Hashtable<String, Member> memberHashtable;
 
-    public MemberHandle() {
+    public MCUMemberHandle() {
         memberHashtable = new Hashtable<>();
     }
 

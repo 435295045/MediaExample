@@ -18,7 +18,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.media.core.MainConstant;
 import com.media.core.R;
 import com.media.core.ui.member.Member;
-import com.media.core.ui.member.MemberHandle;
+import com.media.core.ui.member.MCUMemberHandle;
 import com.media.core.ui.utils.PermissionUtil;
 import com.media.core.ui.utils.SPUtils;
 import com.media.core.ui.utils.Utils;
@@ -42,7 +42,7 @@ public class DoorActivity extends AppCompatActivity implements
     private TextView tViewAnswer;
     private int mScreenWidth;
     //记录所有成员
-    private MemberHandle memberHandle;
+    private MCUMemberHandle mcuMemberHandle;
     private PeerFactoryHelper peerFactory;
 
     @Override
@@ -54,7 +54,7 @@ public class DoorActivity extends AppCompatActivity implements
                 | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_group);
-        memberHandle = new MemberHandle();
+        mcuMemberHandle = new MCUMemberHandle();
         initView();
         //监听状态
         MediaSDK.door().addListener(this);
@@ -126,28 +126,28 @@ public class DoorActivity extends AppCompatActivity implements
     }
 
     private void addMember(DoorState.Media media) {
-        Member member = memberHandle.getMember(media.peer.id);
+        Member member = mcuMemberHandle.getMember(media.peer.id);
         //如果存在先释放
         if (member != null) {
             if (member.renderer != null)
                 fLayoutVideo.removeView(member.renderer);
-            memberHandle.release(media.peer.id);
+            mcuMemberHandle.release(media.peer.id);
         }
         //本地媒体
         if (media.factory != null) {
             this.peerFactory = media.factory;
             //预览自己
             if (media.factory.localMedia != null && media.factory.localMedia.localVideoTrack != null) {
-                memberHandle.createMember(this, media.peer, null);
-                member = memberHandle.getMember(media.peer.id);
+                mcuMemberHandle.createMember(this, media.peer, null);
+                member = mcuMemberHandle.getMember(media.peer.id);
                 media.factory.localMedia.localVideoTrack.addSink(member.sink);
                 if (member.renderer != null)
                     fLayoutVideo.addView(member.renderer, 0);
             }
         } else {
             //远程视频
-            memberHandle.createMember(this, media.peer, media.stream);
-            member = memberHandle.getMember(media.peer.id);
+            mcuMemberHandle.createMember(this, media.peer, media.stream);
+            member = mcuMemberHandle.getMember(media.peer.id);
             if (member.renderer != null)
                 fLayoutVideo.addView(member.renderer);
         }
@@ -155,18 +155,18 @@ public class DoorActivity extends AppCompatActivity implements
     }
 
     private void removeMember(String id) {
-        Member member = memberHandle.getMember(id);
+        Member member = mcuMemberHandle.getMember(id);
         //释放
         if (member != null) {
             if (member.renderer != null)
                 fLayoutVideo.removeView(member.renderer);
-            memberHandle.release(id);
+            mcuMemberHandle.release(id);
         }
         refreshUI();
     }
 
     private void refreshUI() {
-        List<Member> members = new ArrayList<>(memberHandle.memberHashtable.values());
+        List<Member> members = new ArrayList<>(mcuMemberHandle.memberHashtable.values());
         int size = members.size();
         for (int i = 0; i < size; i++) {
             Member member = members.get(i);
@@ -262,7 +262,7 @@ public class DoorActivity extends AppCompatActivity implements
     protected void onDestroy() {
         super.onDestroy();
         //释放所有媒体显示（必须）
-        memberHandle.release();
+        mcuMemberHandle.release();
         //移除监听（必须）
         MediaSDK.door().removeListener(this);
         //释放呼叫（必须）

@@ -13,8 +13,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.media.core.MainConstant;
 import com.media.core.R;
 import com.media.core.ui.member.Member;
-import com.media.core.ui.member.MemberHandle;
-import com.media.core.ui.member.MemberUtils;
+import com.media.core.ui.member.P2PMemberHandle;
 import com.media.core.ui.utils.PermissionUtil;
 import com.media.core.ui.utils.SPUtils;
 import com.media.rtc.MediaSDK;
@@ -28,7 +27,7 @@ public class UDPActivity extends AppCompatActivity implements View.OnClickListen
     private FrameLayout fLayoutLocalVideo, fLayoutRemoteVideo;
     private TextView tViewAnswer;
     //记录所有成员
-    private MemberHandle memberHandle;
+    private P2PMemberHandle p2pMemberHandle;
     private PeerFactoryHelper peerFactory;
     private String[] clients;
 
@@ -41,7 +40,7 @@ public class UDPActivity extends AppCompatActivity implements View.OnClickListen
                 | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_p2p);
-        memberHandle = new MemberHandle();
+        p2pMemberHandle = new P2PMemberHandle();
         initView();
         //监听状态
         MediaSDK.udp().addListener(this);
@@ -130,26 +129,23 @@ public class UDPActivity extends AppCompatActivity implements View.OnClickListen
             }
         } else if (udpState instanceof UDPState.Media) {
             UDPState.Media media = (UDPState.Media) udpState;
-            Member member = memberHandle.getMember(media.peer.id);
-
-            if (media.factory != null){
-                //如果存在先释放
-                if (member != null) {
-                    if (member.renderer != null)
-                        fLayoutLocalVideo.removeView(member.renderer);
-                    memberHandle.release(media.peer.id);
+            if (media.factory != null) {
+                if (p2pMemberHandle.localMember == null) {
+                    Member member = p2pMemberHandle.createLocalMember(this, media.peer);
+                    this.peerFactory = media.factory;
+                    if (media.factory.localMedia != null && media.factory.localMedia.localVideoTrack != null) {
+                        media.factory.localMedia.localVideoTrack.addSink(member.sink);
+                        if (member.renderer != null) {
+                            member.renderer.setZOrderOnTop(true);
+                            fLayoutLocalVideo.addView(member.renderer);
+                        }
+                    }
                 }
-                this.peerFactory = media.factory;
-            }else {
+            } else {
                 //如果存在先释放
-                if (member != null) {
-                    if (member.renderer != null)
-                        fLayoutRemoteVideo.removeView(member.renderer);
-                    memberHandle.release(media.peer.id);
-                }
+                p2pMemberHandle.releaseRemote();
                 //远程视频
-                memberHandle.createMember(this, media.peer, media.stream);
-                member = memberHandle.getMember(media.peer.id);
+                Member member = p2pMemberHandle.createRemoteMember(this, media.peer, media.stream);
                 if (member.renderer != null) {
                     member.renderer.getHolder().setFormat(PixelFormat.TRANSPARENT);
                     fLayoutRemoteVideo.addView(member.renderer);
@@ -162,7 +158,7 @@ public class UDPActivity extends AppCompatActivity implements View.OnClickListen
     protected void onDestroy() {
         super.onDestroy();
         //释放所有媒体显示（必须）
-        memberHandle.release();
+        p2pMemberHandle.release();
         //移除监听（必须）
         MediaSDK.udp().removeListener(this);
         //释放呼叫（必须）

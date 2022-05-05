@@ -242,11 +242,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     public String getIP(String account) {
         String ip = null;
         if (account.equals("adminsystem1")) {
-            ip = "192.168.1.87";
+            ip = "192.168.1.43";
         } else if (account.equals("123456")) {
-            ip = "192.168.1.147";
+            ip = "192.168.1.193";
         } else if (account.equals("147258")) {
-            ip = "192.168.1.121";
+            ip = "192.168.1.195";
         }
         return ip;
     }

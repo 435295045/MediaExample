@@ -40,13 +40,8 @@ public class P2PAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         normalHolder.tViewCall.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                try {
-                    MediaSDK.p2p().call(clients.get(position));
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
                 Intent intent = new Intent(context, P2PActivity.class);
-                intent.putExtra("initiator", "initiator");
+                intent.putExtra("client", clients.get(position));
                 context.startActivity(intent);
             }
         });
