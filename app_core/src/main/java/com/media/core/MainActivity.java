@@ -19,6 +19,8 @@ import com.media.core.ui.group.GroupListActivity;
 import com.media.core.ui.p2p.P2PActivity;
 import com.media.core.ui.p2p.P2PListActivity;
 import com.media.core.ui.room.RoomListActivity;
+import com.media.core.ui.udp.UDPActivity;
+import com.media.core.ui.udp.UDPListActivity;
 import com.media.core.ui.utils.SPUtils;
 import com.media.core.utils.DeviceUuidFactory;
 import com.media.rtc.MediaSDK;
@@ -29,6 +31,10 @@ import com.media.rtc.media.group.listener.GroupListener;
 import com.media.rtc.media.group.listener.state.GroupState;
 import com.media.rtc.media.p2p.listener.P2PListener;
 import com.media.rtc.media.p2p.listener.state.P2PState;
+import com.media.rtc.media.udp.listener.UDPListener;
+import com.media.rtc.media.udp.listener.state.UDPState;
+import com.media.rtc.udp.AccountMappings;
+import com.media.rtc.udp.UDPConfig;
 import com.web.socket.AuthType;
 import com.web.socket.RegisterConfig;
 import com.web.socket.message.MessageConstant;
@@ -40,12 +46,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         RegisterListener,
         GroupListener,
         P2PListener,
-        DoorListener {
-
+        DoorListener,
+        UDPListener,
+        AccountMappings {
     private TextView tViewClient, tViewState;
-    private Button btnGroupCall, btnRoom;
     //设备唯一ID
     private DeviceUuidFactory deviceUuidFactory;
+    private final String server = "ws://120.78.8.170";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,11 +64,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         findViewById(R.id.btnP2PCall).setOnClickListener(this);
 
-        btnGroupCall = findViewById(R.id.btnGroupCall);
+        Button btnGroupCall = findViewById(R.id.btnGroupCall);
         btnGroupCall.setOnClickListener(this);
 
-        btnRoom = findViewById(R.id.btnRoom);
+        Button btnRoom = findViewById(R.id.btnRoom);
         btnRoom.setOnClickListener(this);
+
+        findViewById(R.id.btnIP).setOnClickListener(this);
 
         findViewById(R.id.btnDoor).setOnClickListener(this);
 
@@ -73,15 +82,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         MediaSDK.group().addListener(this);
         //注册门禁监听
         MediaSDK.door().addListener(this);
+        //UDP
+        MediaSDK.udp().addListener(this);
         String clientId = SPUtils.getString(this, MainConstant.SP_KEY_CLIENT, "");
         if (StringUtils.isEmpty(clientId)) {
             clientDialog();
         } else {
-            MediaSDK.register(RegisterConfig.builder()
-                    .authType(AuthType.NON_AUTH)
-                    .deviceId(deviceUuidFactory.getDeviceUuid().toString())
-                    .clientId(clientId)
-            );
+            MediaSDK.register(
+                    RegisterConfig.builder(server)
+                            .authType(AuthType.NON_AUTH)
+                            .deviceId(deviceUuidFactory.getDeviceUuid().toString())
+                            .clientId(clientId),
+                    UDPConfig.builder(5505)
+                            .clientId(clientId)
+                            .AccountMappings(MainActivity.this));
             tViewClient.setText(clientId);
         }
 
@@ -100,6 +114,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             startActivity(new Intent(this, RoomListActivity.class));
         } else if (id == R.id.btnDoor) {
             startActivity(new Intent(this, DoorListActivity.class));
+        } else if (id == R.id.btnIP) {
+            startActivity(new Intent(this, UDPListActivity.class));
         }
     }
 
@@ -115,12 +131,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                         @Override
                         public void onClick(DialogInterface dialogInterface, int i) {
                             String clientId = SPUtils.getString(MainActivity.this, MainConstant.SP_KEY_CLIENT, "");
-                            MediaSDK.register(RegisterConfig.builder()
-                                    .authType(AuthType.NON_AUTH)
-                                    .deviceId(deviceUuidFactory.getDeviceUuid().toString())
-                                    .force(true)
-                                    .clientId(clientId)
-                            );
+                            MediaSDK.register(
+                                    RegisterConfig.builder(server)
+                                            .authType(AuthType.NON_AUTH)
+                                            .deviceId(deviceUuidFactory.getDeviceUuid().toString())
+                                            .force(true)
+                                            .clientId(clientId),
+                                    UDPConfig.builder(5505)
+                                            .clientId(clientId)
+                                            .AccountMappings(MainActivity.this));
                         }
                     })
 
@@ -150,11 +169,14 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             return;
                         }
                         SPUtils.putString(MainActivity.this, MainConstant.SP_KEY_CLIENT, clientId);
-                        MediaSDK.register(RegisterConfig.builder()
-                                .authType(AuthType.NON_AUTH)
-                                .deviceId(deviceUuidFactory.getDeviceUuid().toString())
-                                .clientId(clientId)
-                        );
+                        MediaSDK.register(
+                                RegisterConfig.builder(server)
+                                        .authType(AuthType.NON_AUTH)
+                                        .deviceId(deviceUuidFactory.getDeviceUuid().toString())
+                                        .clientId(clientId),
+                                UDPConfig.builder(5505)
+                                        .clientId(clientId)
+                                        .AccountMappings(MainActivity.this));
                         tViewClient.setText(clientId);
                         dialogInterface.dismiss();
                     }
@@ -197,6 +219,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     }
 
     @Override
+    public void onUDPListener(UDPState udpState) {
+        if (udpState instanceof UDPState.Offer) {
+            //DoorState.Offer offer = (DoorState.Offer) doorState;
+            Intent intent = new Intent(MainActivity.this, UDPActivity.class);
+            startActivity(intent);
+        }
+    }
+
+    @Override
     protected void onDestroy() {
         super.onDestroy();
         MediaSDK.removeRegisterListener(this);
@@ -205,5 +236,23 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         MediaSDK.door().removeListener(this);
         //关闭摄像头
         //CameraHelper.instance().stop();
+    }
+
+    @Override
+    public String getIP(String account) {
+        String ip = null;
+        if (account.equals("adminsystem1")) {
+            ip = "192.168.1.87";
+        } else if (account.equals("123456")) {
+            ip = "192.168.1.147";
+        } else if (account.equals("147258")) {
+            ip = "192.168.1.121";
+        }
+        return ip;
+    }
+
+    @Override
+    public String getAccount(String ip) {
+        return null;
     }
 }
