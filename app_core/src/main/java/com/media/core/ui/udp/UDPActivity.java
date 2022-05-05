@@ -13,6 +13,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.media.core.MainConstant;
 import com.media.core.R;
 import com.media.core.ui.member.Member;
+import com.media.core.ui.member.MemberHandle;
 import com.media.core.ui.member.MemberUtils;
 import com.media.core.ui.utils.PermissionUtil;
 import com.media.core.ui.utils.SPUtils;
@@ -26,7 +27,8 @@ public class UDPActivity extends AppCompatActivity implements View.OnClickListen
 
     private FrameLayout fLayoutLocalVideo, fLayoutRemoteVideo;
     private TextView tViewAnswer;
-    private Member remoteMember;
+    //记录所有成员
+    private MemberHandle memberHandle;
     private PeerFactoryHelper peerFactory;
     private String[] clients;
 
@@ -39,6 +41,7 @@ public class UDPActivity extends AppCompatActivity implements View.OnClickListen
                 | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_p2p);
+        memberHandle = new MemberHandle();
         initView();
         //监听状态
         MediaSDK.udp().addListener(this);
@@ -125,35 +128,41 @@ public class UDPActivity extends AppCompatActivity implements View.OnClickListen
             if (myClientId.equals(hangUp.clientId)) {
                 finish();
             }
-        } else if (udpState instanceof UDPState.LocalMedia) {
-            UDPState.LocalMedia media = (UDPState.LocalMedia) udpState;
-            Member member = MemberUtils.createMember(this, media.peer, null);
-            this.peerFactory = media.factory;
-            //自己预览
-            /*if (media.factory.localMedia != null) {
-                media.factory.localMedia.localVideoTrack.addSink(member.sink);
-                fLayoutLocalVideo.addView(member.renderer);
-                member.renderer.setZOrderOnTop(true);
-            }*/
-        } else if (udpState instanceof UDPState.RemoteMedia) {
-            UDPState.RemoteMedia media = (UDPState.RemoteMedia) udpState;
-            Member member = MemberUtils.createMember(this, media.peer, media.stream);
-            remoteMember = member;
-            fLayoutRemoteVideo.addView(member.renderer);
-            member.renderer.getHolder().setFormat(PixelFormat.TRANSPARENT);
+        } else if (udpState instanceof UDPState.Media) {
+            UDPState.Media media = (UDPState.Media) udpState;
+            Member member = memberHandle.getMember(media.peer.id);
+
+            if (media.factory != null){
+                //如果存在先释放
+                if (member != null) {
+                    if (member.renderer != null)
+                        fLayoutLocalVideo.removeView(member.renderer);
+                    memberHandle.release(media.peer.id);
+                }
+                this.peerFactory = media.factory;
+            }else {
+                //如果存在先释放
+                if (member != null) {
+                    if (member.renderer != null)
+                        fLayoutRemoteVideo.removeView(member.renderer);
+                    memberHandle.release(media.peer.id);
+                }
+                //远程视频
+                memberHandle.createMember(this, media.peer, media.stream);
+                member = memberHandle.getMember(media.peer.id);
+                if (member.renderer != null) {
+                    member.renderer.getHolder().setFormat(PixelFormat.TRANSPARENT);
+                    fLayoutRemoteVideo.addView(member.renderer);
+                }
+            }
         }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (remoteMember != null && remoteMember.renderer != null) {
-            remoteMember.renderer.release();
-        }
-        if (remoteMember != null && remoteMember.sink != null) {
-            remoteMember.sink.setTarget(null);
-        }
-
+        //释放所有媒体显示（必须）
+        memberHandle.release();
         //移除监听（必须）
         MediaSDK.udp().removeListener(this);
         //释放呼叫（必须）

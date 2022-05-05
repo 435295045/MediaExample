@@ -18,7 +18,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.media.core.MainConstant;
 import com.media.core.R;
 import com.media.core.ui.member.Member;
-import com.media.core.ui.member.MemberUtils;
+import com.media.core.ui.member.MemberHandle;
 import com.media.core.ui.utils.PermissionUtil;
 import com.media.core.ui.utils.SPUtils;
 import com.media.core.ui.utils.Utils;
@@ -26,14 +26,12 @@ import com.media.rtc.MediaSDK;
 import com.media.rtc.media.door.listener.DoorListener;
 import com.media.rtc.media.door.listener.state.DoorState;
 import com.media.rtc.webrtc.PeerFactoryHelper;
-import com.media.rtc.webrtc.peer.Peer;
 import com.web.socket.message.MessageConstant;
 import com.web.socket.utils.LoggerUtils;
 
 import org.webrtc.SurfaceViewRenderer;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 public class DoorActivity extends AppCompatActivity implements
@@ -44,7 +42,7 @@ public class DoorActivity extends AppCompatActivity implements
     private TextView tViewAnswer;
     private int mScreenWidth;
     //记录所有成员
-    private final List<Member> members = new ArrayList<>();
+    private MemberHandle memberHandle;
     private PeerFactoryHelper peerFactory;
 
     @Override
@@ -56,6 +54,7 @@ public class DoorActivity extends AppCompatActivity implements
                 | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_group);
+        memberHandle = new MemberHandle();
         initView();
         //监听状态
         MediaSDK.door().addListener(this);
@@ -126,49 +125,53 @@ public class DoorActivity extends AppCompatActivity implements
         }
     }
 
-    private void addMember(Member member, boolean isLocal) {
-        fLayoutVideo.addView(member.renderer);
-        if (isLocal) {
-            members.add(0, member);
-        } else {
-            members.add(member);
+    private void addMember(DoorState.Media media) {
+        Member member = memberHandle.getMember(media.peer.id);
+        LoggerUtils.e(TAG, "---------------:  "+media.toString());
+        //如果存在先释放
+        if (member != null) {
+            if (member.renderer != null)
+                fLayoutVideo.removeView(member.renderer);
+            memberHandle.release(media.peer.id);
         }
-        int size = members.size();
-        for (int i = 0; i < size; i++) {
-            Member forMember = members.get(i);
-            SurfaceViewRenderer renderer = forMember.renderer;
-            if (renderer != null) {
-                FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-                layoutParams.height = Utils.getWidth(mScreenWidth, size);
-                layoutParams.width = Utils.getWidth(mScreenWidth, size);
-                layoutParams.leftMargin = Utils.getX(mScreenWidth, size, i);
-                layoutParams.topMargin = Utils.getY(mScreenWidth, size, i);
-                renderer.setLayoutParams(layoutParams);
+        //本地媒体
+        if (media.factory != null) {
+            this.peerFactory = media.factory;
+            //预览自己
+            if (media.factory.localMedia != null && media.factory.localMedia.localVideoTrack != null) {
+                memberHandle.createMember(this, media.peer, null);
+                member = memberHandle.getMember(media.peer.id);
+                media.factory.localMedia.localVideoTrack.addSink(member.sink);
+                if (member.renderer != null)
+                    fLayoutVideo.addView(member.renderer, 0);
             }
+        } else {
+            //远程视频
+            memberHandle.createMember(this, media.peer, media.stream);
+            member = memberHandle.getMember(media.peer.id);
+            if (member.renderer != null)
+                fLayoutVideo.addView(member.renderer);
         }
+        refreshUI();
     }
 
-    private void removeMember(String clientId) {
-        Iterator<Member> iterator = members.iterator();
-        while (iterator.hasNext()) {
-            Member member = iterator.next();
-            if (clientId.equals(member.peer.id)) {
-                if (member.sink != null) {
-                    member.sink.setTarget(null);
-                }
-                if (member.renderer != null) {
-                    member.renderer.release();
-                }
-                member.peer.dispose();
+    private void removeMember(String id) {
+        Member member = memberHandle.getMember(id);
+        //释放
+        if (member != null) {
+            if (member.renderer != null)
                 fLayoutVideo.removeView(member.renderer);
-                iterator.remove();
-            }
+            memberHandle.release(id);
         }
+        refreshUI();
+    }
+
+    private void refreshUI() {
+        List<Member> members = new ArrayList<>(memberHandle.memberHashtable.values());
         int size = members.size();
         for (int i = 0; i < size; i++) {
-            Member forMember = members.get(i);
-            SurfaceViewRenderer renderer = forMember.renderer;
+            Member member = members.get(i);
+            SurfaceViewRenderer renderer = member.renderer;
             if (renderer != null) {
                 FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
@@ -250,19 +253,9 @@ public class DoorActivity extends AppCompatActivity implements
             } else {
                 removeMember(hangUp.clientId);
             }
-        } else if (doorState instanceof DoorState.LocalMedia) {
-            DoorState.LocalMedia media = (DoorState.LocalMedia) doorState;
-            this.peerFactory = media.factory;
-            Member member = MemberUtils.createMember(this, media.peer, null);
-            if (media.factory.localMedia != null) {
-                media.factory.localMedia.localVideoTrack.addSink(member.sink);
-                addMember(member, true);
-            }
-        } else if (doorState instanceof DoorState.RemoteMedia) {
-            DoorState.RemoteMedia media = (DoorState.RemoteMedia) doorState;
-            //媒体连接成功
-            Member member = MemberUtils.createMember(this, media.peer, media.stream);
-            addMember(member, false);
+        } else if (doorState instanceof DoorState.Media) {
+            DoorState.Media media = (DoorState.Media) doorState;
+            addMember(media);
         }
     }
 
@@ -270,15 +263,7 @@ public class DoorActivity extends AppCompatActivity implements
     protected void onDestroy() {
         super.onDestroy();
         //释放所有媒体显示（必须）
-        for (Member member : members) {
-            if (member.renderer != null) {
-                member.renderer.release();
-            }
-            if (member.sink != null) {
-                member.sink.setTarget(null);
-            }
-        }
-        members.clear();
+        memberHandle.release();
         //移除监听（必须）
         MediaSDK.door().removeListener(this);
         //释放呼叫（必须）

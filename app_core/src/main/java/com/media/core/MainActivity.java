@@ -52,7 +52,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private TextView tViewClient, tViewState;
     //设备唯一ID
     private DeviceUuidFactory deviceUuidFactory;
-    private final String server = "ws://120.78.8.170";
+    private final String server = "ws://192.168.1.222";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {

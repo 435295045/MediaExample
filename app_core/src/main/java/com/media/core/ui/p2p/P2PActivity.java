@@ -12,25 +12,22 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.media.core.R;
 import com.media.core.ui.member.Member;
-import com.media.core.ui.member.MemberUtils;
+import com.media.core.ui.member.MemberHandle;
 import com.media.core.ui.utils.PermissionUtil;
 import com.media.rtc.MediaSDK;
 import com.media.rtc.media.p2p.listener.P2PListener;
 import com.media.rtc.media.p2p.listener.state.P2PState;
 import com.media.rtc.webrtc.PeerFactoryHelper;
-import com.media.rtc.webrtc.peer.Peer;
-import com.web.socket.utils.LoggerUtils;
 import com.web.socket.utils.StringUtils;
-
-import org.webrtc.MediaStream;
 
 public class P2PActivity extends AppCompatActivity implements View.OnClickListener,
         P2PListener {
 
     private FrameLayout fLayoutLocalVideo, fLayoutRemoteVideo;
     private TextView tViewAnswer;
-    private Member remoteMember;
     private PeerFactoryHelper peerFactory;
+    //记录所有成员
+    private MemberHandle memberHandle;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,6 +38,7 @@ public class P2PActivity extends AppCompatActivity implements View.OnClickListen
                 | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_p2p);
+        memberHandle = new MemberHandle();
         initView();
         //监听状态
         MediaSDK.p2p().addListener(this);
@@ -102,35 +100,52 @@ public class P2PActivity extends AppCompatActivity implements View.OnClickListen
 
         } else if (p2pState instanceof P2PState.HangUp) {
             finish();
-        } else if (p2pState instanceof P2PState.LocalMedia) {
-            P2PState.LocalMedia media = (P2PState.LocalMedia) p2pState;
-            Member member = MemberUtils.createMember(this, media.peer, null);
-            this.peerFactory = media.factory;
-            //自己预览
-            if (media.factory.localMedia != null) {
-                media.factory.localMedia.localVideoTrack.addSink(member.sink);
-                fLayoutLocalVideo.addView(member.renderer);
-                member.renderer.setZOrderOnTop(true);
+        } else if (p2pState instanceof P2PState.Media) {
+            P2PState.Media media = (P2PState.Media) p2pState;
+            Member member = memberHandle.getMember(media.peer.id);
+
+            //自己的预览
+            if (media.factory != null) {
+                //如果存在先释放
+                if (member != null) {
+                    if (member.renderer != null)
+                        fLayoutLocalVideo.removeView(member.renderer);
+                    memberHandle.release(media.peer.id);
+                }
+                this.peerFactory = media.factory;
+                //预览自己
+                if (media.factory.localMedia != null) {
+                    memberHandle.createMember(this, media.peer, null);
+                    member = memberHandle.getMember(media.peer.id);
+                    media.factory.localMedia.localVideoTrack.addSink(member.sink);
+                    if (member.renderer != null) {
+                        member.renderer.setZOrderOnTop(true);
+                        fLayoutLocalVideo.addView(member.renderer);
+                    }
+                }
+            } else {
+                //如果存在先释放
+                if (member != null) {
+                    if (member.renderer != null)
+                        fLayoutLocalVideo.removeView(member.renderer);
+                    memberHandle.release(media.peer.id);
+                }
+                //远程视频
+                memberHandle.createMember(this, media.peer, media.stream);
+                member = memberHandle.getMember(media.peer.id);
+                if (member.renderer != null) {
+                    member.renderer.getHolder().setFormat(PixelFormat.TRANSPARENT);
+                    fLayoutRemoteVideo.addView(member.renderer);
+                }
             }
-        } else if (p2pState instanceof P2PState.RemoteMedia) {
-            P2PState.RemoteMedia media = (P2PState.RemoteMedia) p2pState;
-            Member member = MemberUtils.createMember(this, media.peer, media.stream);
-            remoteMember = member;
-            fLayoutRemoteVideo.addView(member.renderer);
-            member.renderer.getHolder().setFormat(PixelFormat.TRANSPARENT);
         }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (remoteMember != null && remoteMember.renderer != null) {
-            remoteMember.renderer.release();
-        }
-        if (remoteMember != null && remoteMember.sink != null) {
-            remoteMember.sink.setTarget(null);
-        }
-
+        //释放所有媒体显示（必须）
+        memberHandle.release();
         //移除监听（必须）
         MediaSDK.p2p().removeListener(this);
         //释放呼叫（必须）
